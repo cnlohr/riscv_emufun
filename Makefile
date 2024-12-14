@@ -2,23 +2,24 @@ all : everything
 
 DTC:=buildroot/output/host/bin/dtc
 
-buildroot :
-	git clone https://github.com/cnlohr/buildroot --recurse-submodules --depth 1
+buildroot.tar.gz :
+	wget https://buildroot.org/downloads/buildroot-2024.05.tar.gz
+	mv buildroot-2024.05.tar.gz buildroot.tar.gz
 
-toolchain : buildroot
-	cp -a configs/custom_kernel_config buildroot/kernel_config
-	cp -a configs/buildroot_config buildroot/.config
-	cp -a configs/busybox_config buildroot/busybox_config
-	cp -a configs/uclibc_config buildroot/uclibc_config
-	cp -a configs/uclibc_config buildroot/uclibc_config_extra
-	true || cp -a configs/rootfsoverlay/* buildroot/output/target/
+buildroot : buildroot.tar.gz
+	tar -xvf buildroot.tar.gz
+	mv buildroot-2024.05 buildroot
+
+buildroot/.config : buildroot
+	make -C buildroot BR2_EXTERNAL=../buildroot_overlay/ minirv32ima_defconfig
+
+toolchain : buildroot/.config
 	make -C buildroot
 
 everything : toolchain
 	make -C hello_linux deploy
 	#make -C packages/duktapetest deploy
 	make -C packages/coremark deploy
-	cp -a configs/rootfsoverlay/* buildroot/output/target/
 	make -C buildroot
 	make -C mini-rv32ima testkern
 
@@ -49,8 +50,6 @@ test_with_qemu :
 #	cp riscv_Kconfig buildroot-2022.02.6/output/build/linux-5.15.67/arch/riscv/
 #	make -C buildroot-2022.02.6
 
-configs/minimal.dtb : configs/minimal.dts $(DTC)
-	$(DTC) -I dts -O dtb -o $@ $< -S 2048
 
 # Trick for extracting the DTB from 
 dtbextract : $(DTC)

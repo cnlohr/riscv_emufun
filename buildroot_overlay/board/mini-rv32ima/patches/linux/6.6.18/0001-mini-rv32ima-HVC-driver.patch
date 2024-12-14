@@ -1,0 +1,117 @@
+From 2c79d8bee1f6274fad2d3b1be8b1ef3ce8dd2a29 Mon Sep 17 00:00:00 2001
+From: Vlad Tomoiaga <vlad.tomoiaga@gmail.com>
+Date: Fri, 3 Mar 2023 17:10:50 +0200
+Subject: [PATCH] mini-rv32ima HVC driver
+
+---
+ drivers/tty/hvc/Kconfig              |  9 ++++
+ drivers/tty/hvc/Makefile             |  1 +
+ drivers/tty/hvc/hvc_riscv_minirv32.c | 66 ++++++++++++++++++++++++++++
+ 3 files changed, 76 insertions(+)
+ create mode 100644 drivers/tty/hvc/hvc_riscv_minirv32.c
+
+diff --git a/drivers/tty/hvc/Kconfig b/drivers/tty/hvc/Kconfig
+index 4f9264d005c0..d71a5667d9d8 100644
+--- a/drivers/tty/hvc/Kconfig
++++ b/drivers/tty/hvc/Kconfig
+@@ -116,6 +116,15 @@ config HVC_RISCV_SBI
+ 
+ 	  If you don't know what do to here, say Y.
+ 
++
++config HVC_RISCV_MINIRV32
++        bool "RISC-V mini-rv32ima console support"
++        select HVC_DRIVER
++        help
++          This enables support for console output for cnlohr's
++          minirv32-ima emulator.
++
++
+ config HVCS
+ 	tristate "IBM Hypervisor Virtual Console Server support"
+ 	depends on PPC_PSERIES && HVC_CONSOLE
+diff --git a/drivers/tty/hvc/Makefile b/drivers/tty/hvc/Makefile
+index 98880e357941..ec1cc5e707c8 100644
+--- a/drivers/tty/hvc/Makefile
++++ b/drivers/tty/hvc/Makefile
+@@ -10,4 +10,5 @@ obj-$(CONFIG_HVC_XEN)		+= hvc_xen.o
+ obj-$(CONFIG_HVC_IUCV)		+= hvc_iucv.o
+ obj-$(CONFIG_HVC_UDBG)		+= hvc_udbg.o
+ obj-$(CONFIG_HVC_RISCV_SBI)	+= hvc_riscv_sbi.o
++obj-$(CONFIG_HVC_RISCV_MINIRV32)+= hvc_riscv_minirv32.o
+ obj-$(CONFIG_HVCS)		+= hvcs.o
+diff --git a/drivers/tty/hvc/hvc_riscv_minirv32.c b/drivers/tty/hvc/hvc_riscv_minirv32.c
+new file mode 100644
+index 000000000000..9cb2bc8c8263
+--- /dev/null
++++ b/drivers/tty/hvc/hvc_riscv_minirv32.c
+@@ -0,0 +1,66 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) 2008 David Gibson, IBM Corporation
++ * Copyright (C) 2012 Regents of the University of California
++ * Copyright (C) 2017 SiFive
++ * Copyright (C) 2023 Vlad Tomoiaga
++ */
++
++#include <linux/console.h>
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/moduleparam.h>
++#include <linux/types.h>
++
++#include "hvc_console.h"
++
++static void minirv32_putchar( char s )
++{
++        asm volatile( "csrrw x0, 0x139, %0\n" : : "r" (s));
++}
++
++static int minirv32_getchar( void ) 
++{
++        int c = 0;
++        asm volatile ("csrr %0,0x140"   : "=r" (c)  );
++        return c;
++}
++
++static int hvc_minirv32_tty_put(uint32_t vtermno, const char *buf, int count)
++{
++	int i;
++	for (i = 0; i < count; i++)
++		minirv32_putchar(buf[i]);
++	return i;
++}
++
++static int hvc_minirv32_tty_get(uint32_t vtermno, char *buf, int count)
++{
++	int i, c;
++	for (i = 0; i < count; i++) {
++		c = minirv32_getchar();
++		if (c < 0)
++			break;
++		buf[i] = c;
++	}
++	return i;
++}
++
++static const struct hv_ops hvc_minirv32_ops = {
++	.get_chars = hvc_minirv32_tty_get,
++	.put_chars = hvc_minirv32_tty_put,
++};
++
++static int __init hvc_minirv32_init(void)
++{
++	return PTR_ERR_OR_ZERO(hvc_alloc(0, 0, &hvc_minirv32_ops, 16));
++}
++device_initcall(hvc_minirv32_init);
++
++static int __init hvc_minirv32_console_init(void)
++{
++	hvc_instantiate(0, 0, &hvc_minirv32_ops);
++
++	return 0;
++}
++console_initcall(hvc_minirv32_console_init);
+-- 
+2.37.2
+

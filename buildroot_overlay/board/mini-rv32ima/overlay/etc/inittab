@@ -14,17 +14,19 @@
 # process   == program to run
 
 # Startup the system
+# ::sysinit:/bin/mount -o remount, rw /
 ::sysinit:/bin/mkdir -p /run/lock/subsys /dev/shm /dev/pts
 ::sysinit:/bin/mount -a
-::sysinit:/bin/hostname -F /etc/hostname
+# ::sysinit:/bin/hostname -F /etc/hostname
 # now run any rc scripts
 # Not using rc scripts.
 # ::sysinit:/etc/init.d/rcS
 
 # Put a getty on the serial port
+# console::sysinit:echo "Booting the system took:"
+# console::sysinit:cat /proc/uptime
 console::sysinit:echo "Welcome to mini-rv32ima Linux"
-console::respawn:/bin/login -f root
-#console::respawn:/bin/getty -L -n -L console 0 vt100 # GENERIC_SERIAL
+console::respawn:/bin/sh
 
 # Stuff to do for the 3-finger salute
 #::ctrlaltdel:/sbin/reboot
