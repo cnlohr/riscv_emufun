@@ -190,7 +190,7 @@ MINIRV32_STEPPROTO
 				}
 				case 0x67: // JALR (0b1100111)
 				{
-					uint32_t imm = ir >> 20;
+					uint32_t imm = ir >> 20; // See https://github.com/cnlohr/mini-rv32ima/issues/43
 					int32_t imm_se = imm | (( imm & 0x800 )?0xfffff000:0);
 					rval = pc + 4;
 					pc = ( (REG( (ir >> 15) & 0x1f ) + imm_se) & ~1) - 4;
@@ -198,8 +198,7 @@ MINIRV32_STEPPROTO
 				}
 				case 0x63: // Branch (0b1100011)
 				{
-					uint32_t immm4 = ((ir & 0xf00)>>7) | ((ir & 0x7e000000)>>20) | ((ir & 0x80) << 4) | ((ir >> 31)<<12);
-					if( immm4 & 0x1000 ) immm4 |= 0xffffe000;
+					uint32_t immm4 = ((ir & 0xf00)>>7) | ((ir & 0x7e000000)>>20) | ((ir & 0x80) << 4) | ((uint32_t)((int32_t)ir >> 19) & 0xfffff000);
 					int32_t rs1 = REG((ir >> 15) & 0x1f);
 					int32_t rs2 = REG((ir >> 20) & 0x1f);
 					immm4 = pc + immm4 - 4;
